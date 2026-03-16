@@ -1,6 +1,6 @@
 # Task Manager (Microservices)
 ## Stack
-- Python/Java/Scala
+- Python 3.12 (FastAPI service in this repo), plus Java/Scala in broader microservices vision
 - Postgres
 - API Gateway
 - File server
@@ -8,7 +8,10 @@
 
 ## Requirements
 - Installed Docker
-- Installed depend libs
+- Installed dependency libs (or use Docker)
+
+## Runtime
+- Python 3.12
 
 ## CLI Tools
 - `make help` to see all available instructions
