@@ -22,6 +22,7 @@
 - Run `make run` in terminal window
 - **If you are running project locally for the first time,** open new window and run `make run && make db-init`
 - open http://127.0.0.1:8000/docs# to get api docs and interface for trying
+- open http://127.0.0.1:8000/ to use the web interface for all API methods
 
 ## TODO like ⭐⭐⭐
 - Logging & Tracing
