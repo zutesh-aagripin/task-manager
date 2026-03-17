@@ -35,8 +35,8 @@ class CustomHTTPBearer(HTTPBearer):
             return user_data
         except jwt.ExpiredSignatureError:
             raise HTTPException(401, "Token is expired")
-        except jwt.InvalidTokenError:
-            raise HTTPException(401, "Invalid token")
+        except jwt.InvalidTokenError as e:
+            raise HTTPException(401, e)
 
 
 oauth2_scheme = CustomHTTPBearer()
