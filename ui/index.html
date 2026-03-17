@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Manager UI</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --success: #047857;
+      --danger: #b91c1c;
+      --border: #d1d5db;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 1.5rem;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    h1 { margin-top: 0; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    .card h2 {
+      margin: 0 0 .75rem;
+      font-size: 1.1rem;
+    }
+
+    form {
+      display: grid;
+      gap: .5rem;
+    }
+
+    input, button {
+      width: 100%;
+      padding: .55rem .65rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: .95rem;
+    }
+
+    button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+
+    button.secondary { background: #4b5563; }
+    button.danger { background: var(--danger); }
+
+    pre {
+      margin: .75rem 0 0;
+      padding: .75rem;
+      border-radius: 8px;
+      background: #111827;
+      color: #f9fafb;
+      overflow-x: auto;
+      min-height: 5rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .token {
+      font-size: .85rem;
+      color: var(--muted);
+      margin-top: .5rem;
+      word-break: break-all;
+    }
+
+    .top-bar {
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .status.warn { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div>
+      <h1>Task Manager UI</h1>
+      <div id="authStatus" class="status warn">Not authenticated</div>
+      <div id="tokenPreview" class="token"></div>
+    </div>
+    <button id="logoutBtn" class="danger" style="max-width: 180px;">Clear token (logout)</button>
+  </div>
+
+  <div class="layout">
+    <section class="card">
+      <h2>POST /user/sign-up</h2>
+      <form id="signupForm">
+        <input name="first_name" placeholder="First name" required />
+        <input name="last_name" placeholder="Last name" required />
+        <input name="username" placeholder="Username" required />
+        <input name="password" placeholder="Password" type="password" required />
+        <button type="submit">Create account</button>
+      </form>
+      <pre id="signupOutput"></pre>
+    </section>
+
+    <section class="card">
+      <h2>POST /user/token (login)</h2>
+      <form id="loginForm">
+        <input name="username" placeholder="Username" required />
+        <input name="password" placeholder="Password" type="password" required />
+        <button type="submit">Login & store token</button>
+      </form>
+      <pre id="loginOutput"></pre>
+    </section>
+
+    <section class="card">
+      <h2>GET /user/profile</h2>
+      <button id="profileBtn">Load profile</button>
+      <pre id="profileOutput"></pre>
+    </section>
+
+    <section class="card">
+      <h2>POST /tasks</h2>
+      <form id="createTaskForm">
+        <input name="title" placeholder="Task title" required />
+        <button type="submit">Create task</button>
+      </form>
+      <pre id="createTaskOutput"></pre>
+    </section>
+
+    <section class="card">
+      <h2>GET /tasks</h2>
+      <button id="allTasksBtn">Load all tasks</button>
+      <pre id="allTasksOutput"></pre>
+    </section>
+
+    <section class="card">
+      <h2>GET /tasks/{task_id}</h2>
+      <form id="singleTaskForm">
+        <input name="task_id" type="number" min="1" placeholder="Task ID" required />
+        <button type="submit">Load task by ID</button>
+      </form>
+      <pre id="singleTaskOutput"></pre>
+    </section>
+  </div>
+
+  <script>
+    const TOKEN_KEY = 'task_manager_access_token';
+
+    function getToken() {
+      return localStorage.getItem(TOKEN_KEY);
+    }
+
+    function setToken(token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      renderAuth();
+    }
+
+    function clearToken() {
+      localStorage.removeItem(TOKEN_KEY);
+      renderAuth();
+    }
+
+    function renderAuth() {
+      const token = getToken();
+      const statusEl = document.getElementById('authStatus');
+      const previewEl = document.getElementById('tokenPreview');
+      if (token) {
+        statusEl.textContent = 'Authenticated';
+        statusEl.classList.remove('warn');
+        previewEl.textContent = `Stored token: ${token.slice(0, 28)}...`;
+      } else {
+        statusEl.textContent = 'Not authenticated';
+        statusEl.classList.add('warn');
+        previewEl.textContent = '';
+      }
+    }
+
+    function renderOutput(id, data) {
+      document.getElementById(id).textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function apiRequest(path, options = {}, useAuth = false) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      if (useAuth) {
+        const token = getToken();
+        if (!token) {
+          throw new Error('No access token. Login first.');
+        }
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(path, { ...options, headers });
+      let payload;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = { detail: await response.text() };
+      }
+
+      if (!response.ok) {
+        throw { status: response.status, payload };
+      }
+      return payload;
+    }
+
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const body = Object.fromEntries(form.entries());
+      try {
+        const data = await apiRequest('/user/sign-up', { method: 'POST', body: JSON.stringify(body) });
+        renderOutput('signupOutput', data);
+      } catch (err) {
+        renderOutput('signupOutput', err.payload || { error: String(err) });
+      }
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const body = Object.fromEntries(form.entries());
+      try {
+        const data = await apiRequest('/user/token', { method: 'POST', body: JSON.stringify(body) });
+        if (data.access_token) setToken(data.access_token);
+        renderOutput('loginOutput', data);
+      } catch (err) {
+        renderOutput('loginOutput', err.payload || { error: String(err) });
+      }
+    });
+
+    document.getElementById('profileBtn').addEventListener('click', async () => {
+      try {
+        const data = await apiRequest('/user/profile', { method: 'GET' }, true);
+        renderOutput('profileOutput', data);
+      } catch (err) {
+        renderOutput('profileOutput', err.payload || { error: String(err) });
+      }
+    });
+
+    document.getElementById('createTaskForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const body = Object.fromEntries(form.entries());
+      try {
+        const data = await apiRequest('/tasks', { method: 'POST', body: JSON.stringify(body) }, true);
+        renderOutput('createTaskOutput', data);
+      } catch (err) {
+        renderOutput('createTaskOutput', err.payload || { error: String(err) });
+      }
+    });
+
+    document.getElementById('allTasksBtn').addEventListener('click', async () => {
+      try {
+        const data = await apiRequest('/tasks', { method: 'GET' }, true);
+        renderOutput('allTasksOutput', data);
+      } catch (err) {
+        renderOutput('allTasksOutput', err.payload || { error: String(err) });
+      }
+    });
+
+    document.getElementById('singleTaskForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const { task_id } = Object.fromEntries(form.entries());
+      try {
+        const data = await apiRequest(`/tasks/${task_id}`, { method: 'GET' }, true);
+        renderOutput('singleTaskOutput', data);
+      } catch (err) {
+        renderOutput('singleTaskOutput', err.payload || { error: String(err) });
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', clearToken);
+    renderAuth();
+  </script>
+</body>
+</html>
